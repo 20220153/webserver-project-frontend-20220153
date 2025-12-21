@@ -1,16 +1,13 @@
 import { useParams, Link } from 'react-router-dom'
-const chess ={
-    "id": "1",
-    "eco": "C50",
-    "name": "이탈리안 게임",
-    "thumbnail_image": "https://placehold.co/600x400/orange/white?text=Italian+Game"
-  }
+import { useQuery } from '@tanstack/react-query'
+import { getChessDetail } from '../api/chessApi.js'
 
-// 태그를 뱃지 형태로 렌더링하는 함수 (별점 대신 사용)
+
 const renderTags = (tags) => {
+  const safeTags = tags || []
   return (
     <div className="flex justify-center items-center space-x-2 mb-4">
-      {tags.map((tag, index) => (
+      {safeTags.map((tag, index) => (
         <span 
           key={index} 
           className="px-3 py-1 bg-indigo-100 text-indigo-700 text-sm font-semibold rounded-full shadow-sm"
@@ -22,40 +19,53 @@ const renderTags = (tags) => {
   )
 }
 
-// 수순(Moves)을 보기 좋게 렌더링하는 함수
 const renderMoves = (moves) => {
+  const safeMoves = moves || []
   return (
     <div className="bg-gray-800 text-gray-100 p-6 rounded-xl shadow-inner font-mono text-sm leading-relaxed tracking-wide">
       <div className="grid grid-cols-2 gap-y-2 gap-x-4">
-        {moves.map((move, index) => {
-          // 2수(백/흑)씩 묶어서 보여주거나, 단순히 나열
-          // 여기서는 백/흑 구분을 위해 짝수 인덱스일 때 앞에 번호를 붙임
+        {safeMoves.map((move, index) => {
           if (index % 2 === 0) {
             return (
               <div key={index} className="col-span-2 sm:col-span-1 border-b border-gray-700 pb-1">
                 <span className="text-gray-400 mr-2">{(index / 2) + 1}.</span>
                 <span className="font-bold text-white mr-2">{move}</span>
-                {moves[index + 1] && <span className="text-gray-300">{moves[index + 1]}</span>}
+                {safeMoves[index + 1] && <span className="text-gray-300">{safeMoves[index + 1]}</span>}
               </div>
             )
           }
-          return null // 홀수 인덱스는 위에서 처리했으므로 렌더링 안 함
+          return null
         })}
       </div>
     </div>
   )
 }
 
-const ChessDetail = ({ chesses }) => {
-  const { id } = useParams();
-  // 2. chesses가 비어있을 때를 대비한 안전장치 추가
-  if (!chesses || chesses.length === 0) {
-    return <div className="p-10 text-center">데이터를 불러오는 중이거나 없습니다...</div>
-  }
-  // URL의 id와 일치하는 체스 오프닝 찾기
-  const chess = chesses.find(c => c.id === id);
+const ChessDetail = () => {
+  const { id } = useParams()
 
-  // 데이터가 없을 경우 처리 (새로고침 직후 등)
+  const { data: chess, isLoading, isError, error } = useQuery({
+    queryKey: ['chess', id],
+    queryFn: () => getChessDetail(id),
+    enabled: !!id,
+  })
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex justify-center items-center">
+        <p className="text-xl text-indigo-600 font-bold animate-pulse">데이터를 불러오는 중...</p>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex justify-center items-center">
+        <p className="text-red-500 font-bold">오류 발생: {error.message}</p>
+      </div>
+    )
+  }
+
   if (!chess) {
     return (
       <div className="min-h-screen bg-gray-50 flex justify-center items-center">
@@ -64,29 +74,27 @@ const ChessDetail = ({ chesses }) => {
     )
   }
 
+  const boardImageSrc = (chess.detail_images && chess.detail_images.length > 0)
+    ? chess.detail_images[0]
+    : chess.thumbnail_image;
+
+
   return (
     <div className="min-h-screen bg-gray-50 p-6 flex justify-center py-12">
       <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-2xl w-full border border-white">
         
-        {/* 1. 상단 태그 영역 (별점 위치 대체) */}
         {renderTags(chess.tags)}
 
-        {/* 2. 이미지 영역 */}
         <div className="flex justify-center mb-8 relative">
-          {/* 배경 장식 효과 */}
           <div className="absolute inset-0 bg-indigo-500 rounded-full blur-3xl opacity-10 transform scale-75"></div>
           
           <img 
-            // src={chess.detail_images && chess.detail_images.length > 0 
-            //       ? chess.detail_images[0] 
-            //       : chess.thumbnail_image}
-            src = {`https://picsum.photos/128/128?random=${chess.id}`}
-            alt={`${chess.name} 체스판`}
-            className="relative w-64 h-64 object-cover rounded-2xl shadow-2xl border-4 border-white transform hover:scale-105 transition duration-500 ease-in-out z-10"
+            src={boardImageSrc}
+            alt={`${chess.name} 체스판 상황`}
+            className="relative w-72 h-72 object-cover rounded-xl shadow-2xl border-4 border-white transform hover:scale-105 transition duration-500 ease-in-out z-10 bg-gray-100"
           />
         </div>
 
-        {/* 3. 제목 및 설명 영역 */}
         <div className="text-center mb-8 border-b pb-8 border-gray-100">
           <h1 className="text-4xl font-extrabold text-gray-900 mb-2 leading-tight">
             {chess.name}
@@ -106,7 +114,6 @@ const ChessDetail = ({ chesses }) => {
           </a>
         </div>
 
-        {/* 4. 설명 텍스트 (가사 위치 대체) */}
         <div className="mb-8">
           <h3 className="text-lg font-bold text-gray-800 mb-3 ml-1">📖 오프닝 설명</h3>
           <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
@@ -116,13 +123,11 @@ const ChessDetail = ({ chesses }) => {
           </div>
         </div>
 
-        {/* 5. 수순 리스트 (추가된 부분) */}
         <div className="mb-8">
           <h3 className="text-lg font-bold text-gray-800 mb-3 ml-1">♟️ 주요 수순 (Main Line)</h3>
           {renderMoves(chess.moves_san)}
         </div>
 
-        {/* 6. 돌아가기 버튼 */}
         <div className="flex justify-center mt-8">
           <Link 
             to="/"
@@ -134,7 +139,7 @@ const ChessDetail = ({ chesses }) => {
         
       </div>
     </div>
-  );
-};
+  )
+}
 
 export default ChessDetail
